@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR Office Simulation</title>
+    <title>VR Street Simulation</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/jsm/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/jsm/controls/OrbitControls.js"></script>
@@ -11,7 +11,7 @@
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; }
     </style>
 </head>
 <body>
@@ -21,67 +21,129 @@
         import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.136/build/three.module.js';
         import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.136/examples/jsm/controls/OrbitControls.js';
         import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.136/examples/jsm/loaders/GLTFLoader.js';
-        
-        class VROfficeSimulation {
+
+        class VRStreetSimulation {
             constructor() {
                 this.scene = new THREE.Scene();
                 this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.xr.enabled = true;
+                this.renderer.shadowMap.enabled = true; // Enable shadows
                 document.body.appendChild(this.renderer.domElement);
                 this.controls = new OrbitControls(this.camera, this.renderer.domElement);
                 this.clock = new THREE.Clock();
-                
+
                 this.assetsLoaded = 0;
-                this.assetsToLoad = 3;
+                this.assetsToLoad = 4; // Store, 2 characters, ground
                 this.loadingElement = document.getElementById('loading');
                 this.vrButton = document.getElementById('enterVR');
-                
+
                 this.setupScene();
                 this.loadAssets();
                 this.setupEventListeners();
                 this.initXR();
                 this.animate();
             }
-            
+
             setupScene() {
-                this.scene.background = new THREE.Color(0xa0a0a0);
+                // Add a ground plane
+                const groundGeometry = new THREE.PlaneGeometry(100, 100);
+                const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                this.scene.add(ground);
+
+                // Background color (sky-like)
+                this.scene.background = new THREE.Color(0x87ceeb); // Light sky blue
+
+                // Lighting
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
                 this.scene.add(ambientLight);
-                
+
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
                 directionalLight.position.set(5, 10, 5);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
                 this.scene.add(directionalLight);
-                
-                this.camera.position.set(0, 1.6, 3);
+
+                // Position camera for street-level view
+                this.camera.position.set(0, 1.6, -3); // Adjusted for street view
+                this.camera.lookAt(0, 1.6, 0);
             }
-            
+
             loadAssets() {
                 const loader = new GLTFLoader();
-                loader.load('path/to/your/3dmodel.glb', (gltf) => {
-                    this.scene.add(gltf.scene);
+
+                // Load bookstore model
+                loader.load('path/to/bookstore_model.glb', (gltf) => {
+                    const bookstore = gltf.scene;
+                    bookstore.position.set(0, 0, 0);
+                    bookstore.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    this.scene.add(bookstore);
                     this.updateLoadingProgress();
-                }, undefined, (error) => console.error(error));
+                }, undefined, (error) => console.error('Bookstore load error:', error));
+
+                // Load character 1 (pink shirt)
+                loader.load('path/to/character1_model.glb', (gltf) => {
+                    const character1 = gltf.scene;
+                    character1.position.set(-1, 0, 0);
+                    character1.traverse((child) => {
+                        if (child.isMesh) child.castShadow = true;
+                    });
+                    this.scene.add(character1);
+                    this.updateLoadingProgress();
+                }, undefined, (error) => console.error('Character 1 load error:', error));
+
+                // Load character 2 (blue shirt)
+                loader.load('path/to/character2_model.glb', (gltf) => {
+                    const character2 = gltf.scene;
+                    character2.position.set(1, 0, 0);
+                    character2.traverse((child) => {
+                        if (child.isMesh) child.castShadow = true;
+                    });
+                    this.scene.add(character2);
+                    this.updateLoadingProgress();
+                }, undefined, (error) => console.error('Character 2 load error:', error));
             }
-            
+
+            updateLoadingProgress() {
+                this.assetsLoaded++;
+                if (this.assetsLoaded === this.assetsToLoad) {
+                    this.loadingElement.style.display = 'none';
+                }
+            }
+
             setupEventListeners() {
                 window.addEventListener('resize', () => {
                     this.camera.aspect = window.innerWidth / window.innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
-                
+
                 this.vrButton.addEventListener('click', async () => {
                     if (navigator.xr) {
-                        const session = await navigator.xr.requestSession('immersive-vr');
+                        const session = await navigator.xr.requestSession('immersive-vr', {
+                            optionalFeatures: ['local-floor', 'bounded-floor']
+                        });
                         this.renderer.xr.setSession(session);
                     } else {
                         console.error('WebXR not supported');
                     }
                 });
             }
-            
+
+            initXR() {
+                // Additional XR setup if needed
+            }
+
             animate() {
                 this.renderer.setAnimationLoop(() => {
                     this.controls.update();
@@ -89,8 +151,8 @@
                 });
             }
         }
-        
-        const vrOffice = new VROfficeSimulation();
+
+        const vrStreet = new VRStreetSimulation();
     </script>
 </body>
 </html>
