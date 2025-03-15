@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VR Office Simulation</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three/examples/jsm/loaders/FontLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/jsm/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/jsm/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill/build/webxr-polyfill.min.js"></script>
@@ -19,6 +18,10 @@
     <div id="loading">Loading...</div>
     <button id="enterVR">Enter VR</button>
     <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.136/build/three.module.js';
+        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.136/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.136/examples/jsm/loaders/GLTFLoader.js';
+        
         class VROfficeSimulation {
             constructor() {
                 this.scene = new THREE.Scene();
@@ -29,89 +32,64 @@
                 document.body.appendChild(this.renderer.domElement);
                 this.controls = new OrbitControls(this.camera, this.renderer.domElement);
                 this.clock = new THREE.Clock();
-
+                
                 this.assetsLoaded = 0;
                 this.assetsToLoad = 3;
                 this.loadingElement = document.getElementById('loading');
                 this.vrButton = document.getElementById('enterVR');
+                
                 this.setupScene();
                 this.loadAssets();
                 this.setupEventListeners();
                 this.initXR();
                 this.animate();
             }
-
+            
             setupScene() {
+                this.scene.background = new THREE.Color(0xa0a0a0);
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
                 this.scene.add(ambientLight);
                 
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(5, 5, 5);
-                directionalLight.castShadow = true;
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                directionalLight.position.set(5, 10, 5);
                 this.scene.add(directionalLight);
-
-                const floorGeometry = new THREE.PlaneGeometry(10, 10);
-                const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
-                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-                floor.rotation.x = -Math.PI / 2;
-                floor.receiveShadow = true;
-                this.scene.add(floor);
-
+                
                 this.camera.position.set(0, 1.6, 3);
             }
-
+            
             loadAssets() {
-                const fontLoader = new THREE.FontLoader();
-                fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (loadedFont) => {
-                    this.font = loadedFont;
+                const loader = new GLTFLoader();
+                loader.load('path/to/your/3dmodel.glb', (gltf) => {
+                    this.scene.add(gltf.scene);
                     this.updateLoadingProgress();
-                });
-
-                setTimeout(() => this.updateLoadingProgress(), 500);
-                setTimeout(() => this.updateLoadingProgress(), 1000);
-                setTimeout(() => this.updateLoadingProgress(), 1500);
+                }, undefined, (error) => console.error(error));
             }
-
-            updateLoadingProgress() {
-                this.assetsLoaded++;
-                if (this.assetsLoaded === this.assetsToLoad) {
-                    setTimeout(() => this.loadingElement.style.display = 'none', 500);
-                    this.vrButton.disabled = false;
-                }
-            }
-
+            
             setupEventListeners() {
                 window.addEventListener('resize', () => {
                     this.camera.aspect = window.innerWidth / window.innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
-
-                this.vrButton.addEventListener('click', () => {
-                    navigator.xr.requestSession('immersive-vr').then(session => {
+                
+                this.vrButton.addEventListener('click', async () => {
+                    if (navigator.xr) {
+                        const session = await navigator.xr.requestSession('immersive-vr');
                         this.renderer.xr.setSession(session);
-                    });
+                    } else {
+                        console.error('WebXR not supported');
+                    }
                 });
             }
-
-            initXR() {
-                this.renderer.xr.addEventListener('sessionstart', () => {
-                    console.log('VR Session Started');
-                });
-
-                this.renderer.xr.addEventListener('sessionend', () => {
-                    console.log('VR Session Ended');
-                });
-            }
-
+            
             animate() {
                 this.renderer.setAnimationLoop(() => {
-                    const delta = this.clock.getDelta();
+                    this.controls.update();
                     this.renderer.render(this.scene, this.camera);
                 });
             }
         }
-
+        
         const vrOffice = new VROfficeSimulation();
     </script>
 </body>
